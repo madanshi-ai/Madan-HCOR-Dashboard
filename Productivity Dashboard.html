@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Madan HCOR Productivity</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#f4f6fa; --panel:#ffffff; --ink:#1a2433; --muted:#5b6b80;
+  --accent:#0b6e9c; --accent2:#13a89e; --warn:#c46a2e; --line:#e2e7ee;
+  --shadow:0 1px 2px rgba(20,30,50,.06),0 6px 24px rgba(20,30,50,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font:14.5px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+.hidden{display:none!important}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 14px;color:var(--ink);transition:background .15s}
+button:hover{background:#f0f3f8}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.primary:hover{background:#0a5e85}
+input{font:inherit;padding:11px 14px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);width:100%}
+input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(11,110,156,.15)}
+
+/* login */
+#login{position:fixed;inset:0;display:grid;place-items:center;background:linear-gradient(135deg,#0b1d2c 0%,#0b6e9c 60%,#13a89e 100%);}
+#login .card{width:380px;max-width:92vw;background:#fff;border-radius:14px;padding:32px;box-shadow:0 18px 60px rgba(0,0,0,.25)}
+#login h1{margin:0 0 4px;font-size:20px}
+#login p.sub{margin:0 0 22px;color:var(--muted);font-size:13.5px}
+#login .row{display:flex;gap:8px;margin-top:14px}
+#login .row button{flex:1}
+#login .err{color:#b3331a;font-size:13px;margin-top:10px;min-height:18px}
+.lock{display:inline-block;width:34px;height:34px;border-radius:9px;background:rgba(11,110,156,.12);color:var(--accent);text-align:center;line-height:34px;margin-right:10px;vertical-align:middle;font-weight:600}
+
+/* app */
+header.top{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid var(--line);padding:14px 28px;display:flex;align-items:center;justify-content:space-between}
+header.top h1{margin:0;font-size:18px;letter-spacing:.2px}
+header.top .meta{color:var(--muted);font-size:12.5px}
+.container{max-width:1320px;margin:0 auto;padding:24px 28px 60px}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:22px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:var(--shadow)}
+.kpi .label{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:6px}
+.kpi .value{font-size:24px;font-weight:600;color:var(--ink);line-height:1.15}
+.kpi .delta{font-size:12.5px;margin-top:6px;color:var(--muted)}
+.kpi .delta.up{color:#1a8c5d}
+.kpi .delta.dn{color:#b3331a}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;box-shadow:var(--shadow)}
+.panel h2{font-size:15px;margin:0 0 12px;display:flex;justify-content:space-between;align-items:center}
+.panel h2 small{font-weight:400;color:var(--muted);font-size:12.5px}
+.panel.full{grid-column:1 / -1}
+.chart-wrap{position:relative;height:320px}
+.chart-wrap.tall{height:380px}
+@media (max-width:1100px){
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .grid{grid-template-columns:1fr}
+}
+.toolbar{display:flex;gap:8px;align-items:center}
+.toolbar select{font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink)}
+footer{text-align:center;color:var(--muted);font-size:12px;margin-top:30px}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<section id="login">
+  <div class="card">
+    <h1><span class="lock">&#x1F512;</span>Madan HCOR Productivity</h1>
+    <p class="sub">Encrypted dashboard. Enter your password to decrypt.</p>
+    <form id="loginForm" autocomplete="off">
+      <input id="pw" type="password" placeholder="Password" autofocus>
+      <div class="err" id="err"></div>
+      <div class="row"><button class="primary" type="submit">Unlock</button></div>
+    </form>
+  </div>
+</section>
+
+<!-- APP -->
+<section id="app" class="hidden">
+  <header class="top">
+    <h1>Madan HCOR Productivity</h1>
+    <div class="meta">
+      <span id="metaText"></span>
+      &nbsp;·&nbsp;
+      <button id="lockBtn">Lock</button>
+    </div>
+  </header>
+  <div class="container">
+    <div class="kpis" id="kpis"></div>
+    <div class="grid">
+      <div class="panel full">
+        <h2>Monthly RVUs by Year <small id="rvuSub"></small></h2>
+        <div class="chart-wrap tall"><canvas id="rvuChart"></canvas></div>
+      </div>
+      <div class="panel full">
+        <h2>Annual Procedure Volumes <small>by year, totals from procedure logs</small></h2>
+        <div class="chart-wrap tall"><canvas id="procChart"></canvas></div>
+      </div>
+      <div class="panel">
+        <h2>
+          Clinic Visits + Echos by Month
+          <span class="toolbar"><select id="clinicYear"></select></span>
+        </h2>
+        <div class="chart-wrap"><canvas id="clinicChart"></canvas></div>
+      </div>
+      <div class="panel">
+        <h2>Annual Total Volume <small>clinic visits + echos, stacked by year</small></h2>
+        <div class="chart-wrap"><canvas id="clinicTotalsChart"></canvas></div>
+      </div>
+      <div class="panel">
+        <h2>2026 Call Earnings by Month</h2>
+        <div class="chart-wrap"><canvas id="callEarnChart"></canvas></div>
+      </div>
+      <div class="panel">
+        <h2>2026 Annual Call Volume <small>STEMI + backup, weekday + weekend</small></h2>
+        <div class="chart-wrap"><canvas id="callStemiChart"></canvas></div>
+      </div>
+      <div class="panel full" id="calendarCallPanel">
+        <h2>2026 Annual Call Volume — Google Calendar <small>nights pulled from your iCal feed</small></h2>
+        <div class="chart-wrap"><canvas id="calendarCallChart"></canvas></div>
+      </div>
+    </div>
+    <footer>Encrypted with AES-256-GCM &middot; Key derived via PBKDF2-SHA256 (200,000 iterations) &middot; Decryption happens locally in your browser.</footer>
+  </div>
+</section>
+
+<script id="payload" type="application/json">{"v": 1, "kdf": "PBKDF2-SHA256", "iter": 200000, "salt": "GOWvmhYgw8lXbEFzU3IlaQ==", "iv": "2TJ2VqlIBgLBdyi+", "ct": "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"}</script>
+
+<script>
+const PAYLOAD = JSON.parse(document.getElementById('payload').textContent);
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// ---------- Crypto ----------
+function b64ToBuf(b64){
+  const bin = atob(b64); const a = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) a[i] = bin.charCodeAt(i);
+  return a.buffer;
+}
+async function decrypt(password){
+  const enc = new TextEncoder();
+  const keyMat = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+  const key = await crypto.subtle.deriveKey(
+    {name:'PBKDF2', salt:b64ToBuf(PAYLOAD.salt), iterations:PAYLOAD.iter, hash:'SHA-256'},
+    keyMat, {name:'AES-GCM', length:256}, false, ['decrypt']);
+  const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv:b64ToBuf(PAYLOAD.iv)}, key, b64ToBuf(PAYLOAD.ct));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+
+// ---------- Login flow ----------
+const form = document.getElementById('loginForm');
+form.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const pw = document.getElementById('pw').value;
+  const err = document.getElementById('err');
+  err.textContent = '';
+  try{
+    const data = await decrypt(pw);
+    document.getElementById('login').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    render(data);
+  }catch(ex){
+    err.textContent = 'Incorrect password.';
+    document.getElementById('pw').select();
+  }
+});
+document.getElementById('lockBtn').addEventListener('click', ()=>{ location.reload(); });
+
+// ---------- Helpers ----------
+const fmt = n => n==null?'—':n.toLocaleString('en-US',{maximumFractionDigits:0});
+const fmtMoney = n => n==null?'—':'$'+Number(n).toLocaleString('en-US',{maximumFractionDigits:0});
+const sumMonths = obj => MONTHS.reduce((s,m)=> s + (obj && obj[m] ? Number(obj[m]) : 0), 0);
+const lastMonthIdxWithData = obj => { let i=-1; MONTHS.forEach((m,j)=>{ if(obj && obj[m]!=null && obj[m]!==0) i=j; }); return i; };
+
+const PALETTE = ['#0b6e9c','#13a89e','#7848b3','#c46a2e','#1a8c5d','#a64d6c','#5470c6','#d4a017','#6c757d','#3b3b58'];
+
+// ---------- Render ----------
+function render(d){
+  const meta = `Last data: ${currentDataDate(d)}`;
+  document.getElementById('metaText').textContent = meta;
+
+  const cy = 2026, py = 2025;
+  const rvuLastIdx = lastMonthIdxWithData(d.rvu_monthly[cy]||{});
+  const cyMonths = MONTHS.slice(0, rvuLastIdx + 1);
+
+  // KPIs
+  const ytdRvu = cyMonths.reduce((s,m)=> s + (d.rvu_monthly[cy][m]||0), 0);
+  const pyYtdRvu = cyMonths.reduce((s,m)=> s + (d.rvu_monthly[py][m]||0), 0);
+  const ytdProc = d.procedure_totals[cy]?.['PCI'] || 0;
+  const pyProc = d.procedure_totals[py]?.['PCI'] || 0;
+  const ytdCV = sumByYear(d.clinic_monthly[cy], 'cv');
+  const ytdEcho = sumByYear(d.clinic_monthly[cy], 'echo');
+  const ytdMeet = Object.values(d.meetings_yearly[cy]||{}).reduce((a,b)=>a+(b||0),0);
+  const calEarn = d.calendar_earnings_2026;
+  const ytdCall = calEarn ? (calEarn.total || 0) : 0;
+  const ytdBonus = calEarn ? (calEarn.bonus || 0) : 0;
+  let callSub;
+  if (!calEarn) {
+    callSub = 'Connect Google Calendar to populate';
+  } else if (ytdBonus > 0) {
+    callSub = `incl. ${fmtMoney(ytdBonus)} holiday bonus`;
+  } else {
+    callSub = 'from Google Calendar shifts';
+  }
+
+  const kpis = document.getElementById('kpis');
+  kpis.innerHTML = '';
+  kpiCard(kpis, 'YTD RVUs (2026)', fmt(ytdRvu), pyYtdRvu? deltaText(ytdRvu, pyYtdRvu, 'vs 2025 same months') : '');
+  kpiCard(kpis, 'YTD PCI', fmt(ytdProc), `${fmt(d.procedure_totals[cy]?.['Diag Cath']||0)} diag cath · ${fmt(d.procedure_totals[cy]?.['STEMI']||0)} STEMI · ${fmt(d.procedure_totals[cy]?.['Right Heart Cath']||0)} RHC`);
+  kpiCard(kpis, 'YTD Clinic Visits', fmt(ytdCV), '');
+  kpiCard(kpis, 'YTD Echos', fmt(ytdEcho), '');
+  kpiCard(kpis, 'YTD Call Earnings', fmtMoney(ytdCall), callSub);
+
+  document.getElementById('rvuSub').textContent = `Through ${MONTHS[rvuLastIdx]} ${cy}`;
+
+  drawRvuChart(d);
+  drawProcChart(d);
+  drawClinicChart(d);
+  drawClinicTotals(d);
+  drawCallEarn(d);
+  drawCallStemi(d);
+  drawCalendarCallChart(d);
+}
+
+function sumByYear(obj, key){ if(!obj) return 0; let s=0; MONTHS.forEach(m=>{ if(obj[m] && obj[m][key]) s += obj[m][key]; }); return s; }
+function deltaText(cur, prev, label){
+  if(!prev) return label;
+  const d = cur - prev; const pct = (d/prev*100);
+  const cls = d>=0?'up':'dn'; const sign = d>=0?'+':'';
+  return `<span class="delta ${cls}">${sign}${fmt(d)} (${sign}${pct.toFixed(1)}%)</span> <span style="color:var(--muted)"> ${label}</span>`;
+}
+function kpiCard(parent, label, value, sub){
+  const el = document.createElement('div'); el.className = 'kpi';
+  el.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div><div class="delta">${sub||''}</div>`;
+  parent.appendChild(el);
+}
+function currentDataDate(d){
+  const idx = lastMonthIdxWithData(d.rvu_monthly[2026]||{});
+  return idx>=0 ? `${MONTHS[idx]} 2026` : 'no 2026 data yet';
+}
+
+// ---------- Charts ----------
+const baseOpts = { responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+  plugins:{ legend:{labels:{boxWidth:12,boxHeight:12,padding:14,font:{size:12}}}, tooltip:{enabled:true} },
+  scales:{ y:{beginAtZero:true,grid:{color:'#eef1f6'}}, x:{grid:{display:false}} }
+};
+
+function drawRvuChart(d){
+  const years = Object.keys(d.rvu_monthly).map(Number).sort();
+  const datasets = years.filter(y=>y>=2021).map((y,i)=>({
+    label: String(y),
+    data: MONTHS.map(m => d.rvu_monthly[y]?.[m] ?? null),
+    borderColor: PALETTE[i % PALETTE.length],
+    backgroundColor: PALETTE[i % PALETTE.length]+'22',
+    borderWidth: y===2026 ? 3 : 2,
+    pointRadius: y===2026 ? 4 : 2,
+    tension:.25, spanGaps:false
+  }));
+  new Chart(document.getElementById('rvuChart'), { type:'line',
+    data:{ labels:MONTHS, datasets }, options: baseOpts });
+}
+
+function drawProcChart(d){
+  const years = Object.keys(d.procedure_totals).map(Number).sort((a,b)=>a-b);
+  const cats = ['Diag Cath','PCI','Right Heart Cath','STEMI','Periph Intervention','Grafts','FFR','IVUS'];
+  const datasets = years.map((y,i)=>({
+    label: String(y),
+    backgroundColor: PALETTE[i % PALETTE.length],
+    borderColor: '#ffffff',
+    borderWidth: 1,
+    data: cats.map(c => (d.procedure_totals[String(y)] || {})[c] ?? 0),
+    categoryPercentage: 0.55,
+    barPercentage: 0.85,
+    maxBarThickness: 36,
+  }));
+  new Chart(document.getElementById('procChart'), {
+    type: 'bar',
+    data: { labels: cats, datasets },
+    options: Object.assign({}, baseOpts, {
+      layout: { padding: { left: 28, right: 28, top: 4, bottom: 0 } },
+      plugins: { legend: { labels: { boxWidth: 14, padding: 14 } }, tooltip: { enabled: true } },
+      scales: { x: { grid: { display: false }, offset: true }, y: { beginAtZero: true, grid: { color: '#eef1f6' } } }
+    })
+  });
+}
+
+function drawClinicChart(d){
+  const years = Object.keys(d.clinic_monthly).map(Number).sort().reverse();
+  const sel = document.getElementById('clinicYear');
+  sel.innerHTML = years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  const ctxEl = document.getElementById('clinicChart');
+  let chart;
+  function build(year){
+    const yObj = d.clinic_monthly[year]||{};
+    const cv = MONTHS.map(m => yObj[m]?.cv ?? null);
+    const echo = MONTHS.map(m => yObj[m]?.echo ?? null);
+    const ds = [
+      { label:'Clinic Visits', data:cv, backgroundColor:'#0b6e9c' },
+      { label:'Echos', data:echo, backgroundColor:'#13a89e' }
+    ];
+    if(chart) chart.destroy();
+    chart = new Chart(ctxEl, { type:'bar', data:{ labels:MONTHS, datasets:ds },
+      options: Object.assign({}, baseOpts, { scales:{ x:{stacked:true,grid:{display:false}}, y:{stacked:true,beginAtZero:true,grid:{color:'#eef1f6'}} } }) });
+  }
+  build(years[0]);
+  sel.addEventListener('change', ()=> build(parseInt(sel.value)));
+}
+
+function drawClinicTotals(d){
+  const years = Object.keys(d.clinic_monthly).map(Number).sort((a,b)=>a-b);
+  const cv = years.map(y => sumByYear(d.clinic_monthly[String(y)], 'cv'));
+  const echo = years.map(y => sumByYear(d.clinic_monthly[String(y)], 'echo'));
+  new Chart(document.getElementById('clinicTotalsChart'), {
+    type:'bar',
+    data:{ labels:years.map(String), datasets:[
+      { label:'Clinic Visits', data:cv,   backgroundColor:'#0b6e9c' },
+      { label:'Echos',         data:echo, backgroundColor:'#13a89e' }
+    ]},
+    options: Object.assign({}, baseOpts, {
+      plugins:{ legend:{position:'bottom',labels:{boxWidth:14,padding:14}},
+        tooltip:{ callbacks:{ footer: items => 'Total: ' + items.reduce((s,i)=>s+i.parsed.y,0).toLocaleString() } } },
+      scales:{ x:{stacked:true,grid:{display:false}},
+               y:{stacked:true,beginAtZero:true,grid:{color:'#eef1f6'}} }
+    })
+  });
+}
+
+function drawCallEarn(d){
+  const rows = (d.call_2026||[]).filter(r => r.total>0);
+  new Chart(document.getElementById('callEarnChart'), {
+    type:'bar',
+    data:{ labels: rows.map(r=>r.month),
+      datasets:[{ label:'Total ($)', data: rows.map(r=>r.total), backgroundColor:'#c46a2e' }]},
+    options: Object.assign({}, baseOpts, { plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: c => '$'+c.parsed.y.toLocaleString('en-US',{maximumFractionDigits:0}) } } },
+      scales:{ y:{beginAtZero:true, ticks:{ callback: v => '$'+v.toLocaleString() }, grid:{color:'#eef1f6'} }, x:{grid:{display:false}} } })
+  });
+}
+
+function drawCalendarCallChart(d){
+  const cal = d.calendar_call_2026;
+  const panel = document.getElementById('calendarCallPanel');
+  const wrap = panel.querySelector('.chart-wrap');
+  if (!cal) {
+    wrap.innerHTML = '<div style="display:flex;height:100%;align-items:center;justify-content:center;text-align:center;color:var(--muted);padding:24px;line-height:1.55"><div>Google Calendar not connected yet.<br>Double-click <code>Connect Google Calendar.command</code> in this folder to add your iCal URL.</div></div>';
+    return;
+  }
+  const labels = MONTHS;
+  const get = k => labels.map(m => cal[m]?.[k] || 0);
+  new Chart(document.getElementById('calendarCallChart'), {
+    type: 'bar',
+    data: { labels, datasets: [
+      { label:'STEMI NC',           data:get('stemi_nc'),     backgroundColor:'#0b6e9c' },
+      { label:'B/U NC',              data:get('bu_nc'),        backgroundColor:'#13a89e' },
+      { label:'MCR NC',              data:get('mcr_nc'),       backgroundColor:'#1a8c5d' },
+      { label:'PVH/GH NC',          data:get('pvh_gh_nc'),    backgroundColor:'#a64d6c' },
+      { label:'STEMI Weekend NC',   data:get('stemi_weekend'),backgroundColor:'#7848b3' },
+      { label:'B/U Weekend NC',     data:get('bu_weekend'),   backgroundColor:'#c46a2e' },
+      { label:'GH Weekend',          data:get('gh_weekend'),   backgroundColor:'#5470c6' },
+      { label:'Scottsbluff (pairs)', data:get('scottsbluff'),  backgroundColor:'#d4a017' },
+    ]},
+    options: Object.assign({}, baseOpts, {
+      plugins:{ legend:{position:'bottom',labels:{boxWidth:14,padding:12}},
+        tooltip:{ callbacks:{ footer: items => 'Total: ' + items.reduce((s,i)=>s+i.parsed.y,0) } } },
+      scales:{ x:{stacked:true,grid:{display:false}},
+               y:{stacked:true,beginAtZero:true,ticks:{precision:0},grid:{color:'#eef1f6'}} }
+    })
+  });
+}
+
+function drawCallStemi(d){
+  const rows = (d.call_2026||[]).filter(r => (r.stemi||0)+(r.stemi_weekend||0)>0 || r.total>0);
+  new Chart(document.getElementById('callStemiChart'), {
+    type:'bar',
+    data:{ labels: rows.map(r=>r.month), datasets:[
+      { label:'STEMI Weekday', data: rows.map(r=>r.stemi||0), backgroundColor:'#0b6e9c' },
+      { label:'STEMI Weekend', data: rows.map(r=>r.stemi_weekend||0), backgroundColor:'#7848b3' },
+      { label:'Backup Weekday', data: rows.map(r=>r.backup||0), backgroundColor:'#13a89e' },
+      { label:'Backup Weekend', data: rows.map(r=>r.backup_weekend||0), backgroundColor:'#c46a2e' },
+    ]},
+    options: Object.assign({}, baseOpts, { scales:{ x:{stacked:true,grid:{display:false}}, y:{stacked:true,beginAtZero:true,grid:{color:'#eef1f6'}} } })
+  });
+}
+</script>
+</body>
+</html>
