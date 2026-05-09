@@ -56,6 +56,8 @@ header.top .meta{color:var(--muted);font-size:12.5px}
 }
 .toolbar{display:flex;gap:8px;align-items:center}
 .toolbar select{font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink)}
+.cal-summary{display:inline-flex;align-items:baseline;gap:8px;margin-top:14px;padding:8px 14px;background:#f4f6fa;border:1px solid var(--line);border-radius:8px;font-size:13px;color:var(--muted)}
+.cal-summary .num{font-size:18px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
 footer{text-align:center;color:var(--muted);font-size:12px;margin-top:30px}
 </style>
 </head>
@@ -109,6 +111,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;margin-top:30px}
       <div class="panel full" id="calendarCallPanel">
         <h2>2026 Annual Call Volume — Google Calendar <small>nights pulled from your iCal feed</small></h2>
         <div class="chart-wrap"><canvas id="calendarCallChart"></canvas></div>
+        <div class="cal-summary" id="calTotalBox">Total call nights: <span class="num" id="calTotalNights">—</span></div>
       </div>
     </div>
     <footer>Encrypted with AES-256-GCM &middot; Key derived via PBKDF2-SHA256 (200,000 iterations) &middot; Decryption happens locally in your browser.</footer>
@@ -349,23 +352,34 @@ function drawCalendarCallChart(d){
   const cal = d.calendar_call_2026;
   const panel = document.getElementById('calendarCallPanel');
   const wrap = panel.querySelector('.chart-wrap');
+  const totalBox = document.getElementById('calTotalBox');
   if (!cal) {
     wrap.innerHTML = '<div style="display:flex;height:100%;align-items:center;justify-content:center;text-align:center;color:var(--muted);padding:24px;line-height:1.55"><div>Google Calendar not connected yet.<br>Double-click <code>Connect Google Calendar.command</code> in this folder to add your iCal URL.</div></div>';
+    if (totalBox) totalBox.style.display = 'none';
     return;
   }
   const labels = MONTHS;
   const get = k => labels.map(m => cal[m]?.[k] || 0);
+  const totalNights = labels.reduce((s, m) => {
+    const v = cal[m] || {};
+    // Other buckets store one count per calendar date; Scottsbluff stays as
+    // one per pair (per user spec) and is counted as 1 in the total.
+    return s + (v.stemi_nc||0) + (v.bu_nc||0) + (v.mcr_nc||0) + (v.pvh_gh_nc||0)
+             + (v.stemi_weekend||0) + (v.bu_weekend||0) + (v.gh_weekend||0)
+             + (v.scottsbluff||0);
+  }, 0);
+  document.getElementById('calTotalNights').textContent = totalNights.toLocaleString();
   new Chart(document.getElementById('calendarCallChart'), {
     type: 'bar',
     data: { labels, datasets: [
-      { label:'STEMI NC',           data:get('stemi_nc'),     backgroundColor:'#0b6e9c' },
-      { label:'B/U NC',              data:get('bu_nc'),        backgroundColor:'#13a89e' },
-      { label:'MCR NC',              data:get('mcr_nc'),       backgroundColor:'#1a8c5d' },
-      { label:'PVH/GH NC',          data:get('pvh_gh_nc'),    backgroundColor:'#a64d6c' },
-      { label:'STEMI Weekend NC',   data:get('stemi_weekend'),backgroundColor:'#7848b3' },
-      { label:'B/U Weekend NC',     data:get('bu_weekend'),   backgroundColor:'#c46a2e' },
-      { label:'GH Weekend',          data:get('gh_weekend'),   backgroundColor:'#5470c6' },
-      { label:'Scottsbluff', data:get('scottsbluff'),  backgroundColor:'#d4a017' },
+      { label:'STEMI NC',         data:get('stemi_nc'),      backgroundColor:'#cb333b' }, // UCHealth red
+      { label:'STEMI Weekend NC', data:get('stemi_weekend'), backgroundColor:'#a31621' }, // deep red
+      { label:'B/U NC',            data:get('bu_nc'),         backgroundColor:'#e0a800' }, // mustard yellow
+      { label:'B/U Weekend NC',   data:get('bu_weekend'),    backgroundColor:'#b8860b' }, // dark yellow
+      { label:'MCR NC',            data:get('mcr_nc'),        backgroundColor:'#d81b60' }, // magenta
+      { label:'PVH/GH NC',        data:get('pvh_gh_nc'),     backgroundColor:'#0097a7' }, // teal
+      { label:'GH Weekend',        data:get('gh_weekend'),    backgroundColor:'#43a047' }, // medium green
+      { label:'Scottsbluff',       data:get('scottsbluff'),   backgroundColor:'#7b1fa2' }, // purple
     ]},
     options: Object.assign({}, baseOpts, {
       plugins:{ legend:{position:'bottom',labels:{boxWidth:14,padding:12}},
