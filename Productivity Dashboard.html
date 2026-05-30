@@ -680,6 +680,17 @@ async function sfPollNowPlaying(){
     return;
   }
   const item = state.item;
+
+  // Place the widget under whichever panel matches what's playing:
+  //   • music track  → under "Shiv's Cath Lab Playlist"
+  //   • podcast episode → under the "Listening" panel
+  const playlistPanel = document.getElementById('playlistPanel');
+  const podcastPanel = document.getElementById('spotifyPanel');
+  const target = (item.type === 'track' && playlistPanel) ? playlistPanel : podcastPanel;
+  if (np && target && np.parentElement !== target){
+    target.appendChild(np);
+  }
+
   let title = item.name || '—';
   let sub = '';
   if (item.type === 'track'){
